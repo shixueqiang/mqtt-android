@@ -9,7 +9,7 @@ import android.os.Parcelable;
  * Date: 2018-10-26
  * Time: 下午4:58
  */
-public class Message implements Parcelable {
+public class MqttMessage implements Parcelable {
     private int msgType;
     private String topic;
     private byte[] payload;
@@ -19,26 +19,26 @@ public class Message implements Parcelable {
     public static final int SUBSCRIBE = 0x80;
     public static final int UNSUBSCRIBE = 0xA0;
 
-    public Message() {
+    public MqttMessage() {
 
     }
 
-    protected Message(Parcel in) {
+    protected MqttMessage(Parcel in) {
         msgType = in.readInt();
         topic = in.readString();
         payload = in.createByteArray();
         qos = in.readInt();
     }
 
-    public static final Creator<Message> CREATOR = new Creator<Message>() {
+    public static final Creator<MqttMessage> CREATOR = new Creator<MqttMessage>() {
         @Override
-        public Message createFromParcel(Parcel in) {
-            return new Message(in);
+        public MqttMessage createFromParcel(Parcel in) {
+            return new MqttMessage(in);
         }
 
         @Override
-        public Message[] newArray(int size) {
-            return new Message[size];
+        public MqttMessage[] newArray(int size) {
+            return new MqttMessage[size];
         }
     };
 

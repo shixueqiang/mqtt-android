@@ -2,6 +2,7 @@ package com.shixq.mqtt.service;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -14,6 +15,7 @@ import android.util.Log;
 import com.mqtt.jni.MessageListener;
 import com.mqtt.jni.MosquittoJNI;
 import com.shixq.mqtt.model.Config;
+import com.shixq.mqtt.model.MqttMessage;
 
 /**
  * Created with shixq.
@@ -26,11 +28,15 @@ public class MqttService extends Service {
     private MosquittoJNI mMosquitto;
     private Messenger mClientMessenger;
     private Config mCfg;
+    private boolean isConnected;
+    private boolean isStarted;
     public static final int MSG_CLIENT_MESSENGER = 0x1;
     public static final int MSG_MESSAGE = 0x2;
     public static final int MSG_MESSAGE_CALLBACK = 0x3;
     public static final int MSG_CONNECT = 0x4;
     public static final String MQTT_CONFIG = "MQTT_CONFIG";
+    public static final String BUNDLE_CONFIG = "BUNDLE_CONFIG";
+    public static final String BUNDLE_MESSAGE = "BUNDLE_MESSAGE";
 
     private class MessengerHandler extends Handler {
         @Override
@@ -39,14 +45,23 @@ public class MqttService extends Service {
             switch (msg.what) {
                 case MSG_CLIENT_MESSENGER:
                     mClientMessenger = msg.replyTo;
+                    if (isConnected) {
+                        try {
+                            mClientMessenger.send(Message.obtain(null, MSG_CONNECT));
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    }
                     break;
                 case MSG_MESSAGE:
-                    com.shixq.mqtt.model.Message message = (com.shixq.mqtt.model.Message) msg.obj;
+                    Bundle bundle = msg.getData();
+                    bundle.setClassLoader(getClass().getClassLoader());
+                    MqttMessage message = bundle.getParcelable(BUNDLE_MESSAGE);
                     switch (message.getMsgType()) {
-                        case com.shixq.mqtt.model.Message.SUBSCRIBE:
+                        case MqttMessage.SUBSCRIBE:
                             mMosquitto.subscribe(new String[]{message.getTopic()}, message.getQos());
                             break;
-                        case com.shixq.mqtt.model.Message.UNSUBSCRIBE:
+                        case MqttMessage.UNSUBSCRIBE:
                             mMosquitto.unsubscribe(new String[]{message.getTopic()});
                             break;
                     }
@@ -68,13 +83,16 @@ public class MqttService extends Service {
             public void onMessage(String topic, byte[] message) {
                 Message msg = Message.obtain();
                 msg.what = MSG_MESSAGE_CALLBACK;
-                com.shixq.mqtt.model.Message m = new com.shixq.mqtt.model.Message();
+                MqttMessage m = new MqttMessage();
                 m.setTopic(topic);
                 m.setPayload(message);
-                msg.obj = m;
+                Bundle bundle = new Bundle();
+                bundle.putParcelable(BUNDLE_MESSAGE, m);
+                msg.setData(bundle);
                 try {
                     mClientMessenger.send(msg);
                 } catch (RemoteException e) {
+                    Log.e(TAG, "RemoteException", e);
                     e.printStackTrace();
                 }
             }
@@ -82,8 +100,15 @@ public class MqttService extends Service {
             @Override
             public void onConnect() {
                 try {
-                    mClientMessenger.send(Message.obtain(null, MSG_CONNECT));
-                } catch (RemoteException e) {
+                    Log.e(TAG, "onConnect");
+                    isConnected = true;
+                    if (mClientMessenger != null) {
+                        mClientMessenger.send(Message.obtain(null, MSG_CONNECT));
+                    } else {
+                        Log.e(TAG, "onConnect mClientMessenger is null");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "RemoteException", e);
                     e.printStackTrace();
                 }
             }
@@ -98,13 +123,18 @@ public class MqttService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.e(TAG, "onStartCommand");
-        mCfg = intent.getParcelableExtra(MQTT_CONFIG);
-        nativeRun(mCfg);
+        if (!isStarted) {
+            Bundle bundle = intent.getBundleExtra(BUNDLE_CONFIG);
+            mCfg = bundle.getParcelable(MQTT_CONFIG);
+            mMosquitto.nativeSetupJNI();
+            nativeRun(mCfg);
+            isStarted = true;
+        }
         return super.onStartCommand(intent, flags, startId);
     }
 
     private void nativeRun(Config cfg) {
-        StringBuffer mBuffer = new StringBuffer();
+        final StringBuffer mBuffer = new StringBuffer();
         mBuffer.append("mosquitto_sub ");
         mBuffer.append("-h ");
         mBuffer.append(cfg.getHost() + " ");
@@ -125,7 +155,13 @@ public class MqttService extends Service {
         if (cfg.isDebug()) {
             mBuffer.append("-d");
         }
-        mMosquitto.nativeRunMain("mqtt_main", mBuffer.toString().split(" "));
+        final String[] argv = mBuffer.toString().split(" ");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                mMosquitto.nativeRunMain(argv);
+            }
+        }).start();
     }
 
     @Override

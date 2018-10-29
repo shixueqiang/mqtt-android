@@ -2,46 +2,41 @@ package com.shixq.mqttdemo
 
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
-import android.util.Log
 import android.widget.TextView
-import com.mqtt.jni.MessageListener
-import com.mqtt.jni.MosquittoJNI
+import com.shixq.mqtt.Mqtt
+import com.shixq.mqtt.model.Config
 import java.nio.charset.Charset
 
 class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
-    private lateinit var mosquitto: MosquittoJNI
     private lateinit var tvMessage: TextView
+    private lateinit var mqtt: Mqtt
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         tvMessage = findViewById(R.id.message)
-        mosquitto = MosquittoJNI.getInstance()
-        mosquitto.setMessageListener(object : MessageListener {
-            override fun onDebugLog(log: String?) {
-                Log.e(TAG, log)
+        mqtt = Mqtt.init(this)
+        val config = Config.Builder("192.168.0.114")
+                .port(1883)
+                .debug(true)
+                .build()
+        mqtt.config(config)
+        mqtt.setmMessageCallback { msg ->
+            runOnUiThread {
+                val stringBuffer = StringBuffer()
+                stringBuffer.append(tvMessage.text)
+                stringBuffer.append("\n")
+                stringBuffer.append(String(msg.payload, Charset.forName("utf-8")))
+                tvMessage.text = stringBuffer.toString()
             }
+        }
+        mqtt.start()
+        mqtt.subscribe("test/shixq", 1)
+    }
 
-            override fun onMessage(topic: String, message: ByteArray) {
-                Log.e(TAG, "receive $topic message:" + String(message, Charset.forName("utf-8")))
-                val mStringBuffer = StringBuffer()
-                mStringBuffer.append(tvMessage.text)
-                mStringBuffer.append("\n")
-                mStringBuffer.append(String(message, Charset.forName("utf-8")))
-                runOnUiThread {
-                    tvMessage.text = mStringBuffer.toString()
-                }
-            }
-
-            override fun onConnect() {
-                mosquitto.subscribe(arrayOf("test/shixq"), 1)
-            }
-        })
-        mosquitto.nativeSetupJNI()
-        Thread(Runnable {
-            val status = mosquitto.nativeRunMain("mqtt_main", arrayOf("mosquitto_sub", "-h", "192.168.0.114", "-p", "1883", "-t", "test/topic", "-v", "-d"))
-            Log.e(TAG, "nativeRunMain status $status")
-        }).start()
+    override fun onDestroy() {
+        super.onDestroy()
+        mqtt.onDestroy()
     }
 }

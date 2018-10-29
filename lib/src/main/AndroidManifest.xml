@@ -2,4 +2,9 @@
     package="com.shixq.mqtt">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <application>
+        <service
+            android:name="com.shixq.mqtt.service.MqttService"
+            android:process=":bg" />
+    </application>
 </manifest>
