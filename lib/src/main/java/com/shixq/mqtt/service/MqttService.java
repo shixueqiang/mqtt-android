@@ -17,6 +17,9 @@ import com.mqtt.jni.MosquittoJNI;
 import com.shixq.mqtt.model.Config;
 import com.shixq.mqtt.model.MqttMessage;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * Created with shixq.
  * Description:
@@ -30,6 +33,7 @@ public class MqttService extends Service {
     private Config mCfg;
     private boolean isConnected;
     private boolean isStarted;
+    private ExecutorService mFixedThreadPool = Executors.newFixedThreadPool(5);
     public static final int MSG_CLIENT_MESSENGER = 0x1;
     public static final int MSG_MESSAGE = 0x2;
     public static final int MSG_MESSAGE_CALLBACK = 0x3;
@@ -63,6 +67,29 @@ public class MqttService extends Service {
                             break;
                         case MqttMessage.UNSUBSCRIBE:
                             mMosquitto.unsubscribe(new String[]{message.getTopic()});
+                            break;
+                        case MqttMessage.PUBLISH:
+                            final StringBuffer stringBuffer = new StringBuffer("mosquitto_pub ");
+                            stringBuffer.append("-h ");
+                            stringBuffer.append(mCfg.getHost() + " ");
+                            stringBuffer.append("-p ");
+                            stringBuffer.append(mCfg.getPort() + " ");
+                            stringBuffer.append("-i ");
+                            stringBuffer.append(mCfg.getId() + "-pub ");
+                            stringBuffer.append("-t ");
+                            stringBuffer.append(message.getTopic() + " ");
+                            stringBuffer.append("-m ");
+                            stringBuffer.append(message.payloadToString() + " ");
+                            stringBuffer.append("-q ");
+                            stringBuffer.append(1 + " ");
+                            stringBuffer.append("-d");
+                            mFixedThreadPool.submit(new Runnable() {
+                                @Override
+                                public void run() {
+                                    Log.e(TAG, stringBuffer.toString());
+                                    mMosquitto.publish(stringBuffer.toString().split(" "));
+                                }
+                            });
                             break;
                     }
                     break;
@@ -117,6 +144,11 @@ public class MqttService extends Service {
             public void onDebugLog(String log) {
                 Log.e(TAG, log);
             }
+
+            @Override
+            public void onPublishEnd(String topic) {
+                Log.e(TAG, "onPublishEnd:" + topic);
+            }
         });
     }
 
@@ -134,12 +166,15 @@ public class MqttService extends Service {
     }
 
     private void nativeRun(Config cfg) {
-        final StringBuffer mBuffer = new StringBuffer();
-        mBuffer.append("mosquitto_sub ");
+        final StringBuffer mBuffer = new StringBuffer("mosquitto_sub ");
         mBuffer.append("-h ");
         mBuffer.append(cfg.getHost() + " ");
         mBuffer.append("-p ");
         mBuffer.append(cfg.getPort() + " ");
+        if (!TextUtils.isEmpty(cfg.getId())) {
+            mBuffer.append("-i ");
+            mBuffer.append(cfg.getId() + "-sub ");
+        }
         if (!TextUtils.isEmpty(cfg.getUsername())) {
             mBuffer.append("-u ");
             mBuffer.append(cfg.getUsername() + " ");
@@ -156,12 +191,12 @@ public class MqttService extends Service {
             mBuffer.append("-d");
         }
         final String[] argv = mBuffer.toString().split(" ");
-        new Thread(new Runnable() {
+        mFixedThreadPool.submit(new Runnable() {
             @Override
             public void run() {
                 mMosquitto.nativeRunMain(argv);
             }
-        }).start();
+        });
     }
 
     @Override

@@ -51,11 +51,9 @@ public class Mqtt {
                         for (MqttMessage mqttMessage : needSubscribe) {
                             Mqtt.this.sendMessage(mqttMessage);
                         }
-                        needSubscribe.clear();
                         for (MqttMessage mqttMessage : needUnsubscribe) {
                             Mqtt.this.sendMessage(mqttMessage);
                         }
-                        needUnsubscribe.clear();
                     }
                     break;
                 case MqttService.MSG_MESSAGE_CALLBACK:
@@ -123,8 +121,10 @@ public class Mqtt {
         Bundle bundle = new Bundle();
         bundle.putParcelable(MqttService.MQTT_CONFIG, mCfg);
         service.putExtra(MqttService.BUNDLE_CONFIG, bundle);
-        mContext.bindService(service, mConn, Context.BIND_AUTO_CREATE);
         mContext.startService(service);
+        if (mRemoteMessenger == null) {
+            mContext.bindService(service, mConn, Context.BIND_AUTO_CREATE);
+        }
     }
 
     public void subscribe(String topic, int qos) {
@@ -147,6 +147,17 @@ public class Mqtt {
             sendMessage(message);
         } else {
             needUnsubscribe.add(message);
+        }
+    }
+
+    public void publish(String topic, byte[] payload, int qos) {
+        MqttMessage message = new MqttMessage();
+        message.setMsgType(MqttMessage.PUBLISH);
+        message.setTopic(topic);
+        message.setPayload(payload);
+        message.setQos(qos);
+        if (connected) {
+            sendMessage(message);
         }
     }
 

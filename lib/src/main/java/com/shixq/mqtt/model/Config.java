@@ -10,6 +10,7 @@ import android.os.Parcelable;
  * Time: 下午4:58
  */
 public class Config implements Parcelable {
+    private String id;
     private String host;
     private int port = 1883;
     private String username;
@@ -21,6 +22,7 @@ public class Config implements Parcelable {
     public static final int MQTT_PROTOCOL_V311 = 4;
 
     protected Config(Parcel in) {
+        id = in.readString();
         host = in.readString();
         port = in.readInt();
         username = in.readString();
@@ -31,6 +33,7 @@ public class Config implements Parcelable {
     }
 
     private Config(Builder builder) {
+        id = builder.id;
         host = builder.host;
         port = builder.port;
         username = builder.username;
@@ -41,6 +44,7 @@ public class Config implements Parcelable {
     }
 
     public static class Builder {
+        private String id;
         private String host;
         private int port;
         private String username;
@@ -51,6 +55,11 @@ public class Config implements Parcelable {
 
         public Builder(String host) {
             this.host = host;
+        }
+
+        public Builder id(String val) {
+            id = val;
+            return this;
         }
 
         public Builder port(int val) {
@@ -99,6 +108,14 @@ public class Config implements Parcelable {
             return new Config[size];
         }
     };
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 
     public String getHost() {
         return host;
@@ -163,6 +180,7 @@ public class Config implements Parcelable {
 
     @Override
     public void writeToParcel(Parcel parcel, int i) {
+        parcel.writeString(id);
         parcel.writeString(host);
         parcel.writeInt(port);
         parcel.writeString(username);

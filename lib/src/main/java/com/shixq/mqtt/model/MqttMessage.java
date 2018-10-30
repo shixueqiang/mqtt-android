@@ -3,6 +3,8 @@ package com.shixq.mqtt.model;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import java.io.UnsupportedEncodingException;
+
 /**
  * Created with author.
  * Description:
@@ -60,6 +62,15 @@ public class MqttMessage implements Parcelable {
 
     public byte[] getPayload() {
         return payload;
+    }
+
+    public String payloadToString() {
+        try {
+            return new String(payload, "utf-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return payload.toString();
     }
 
     public void setPayload(byte[] payload) {
