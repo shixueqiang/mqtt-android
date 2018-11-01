@@ -1,65 +1,59 @@
 package com.mqtt.jni;
 
 public class MosquittoJNI {
-  private static volatile MosquittoJNI mInstance = null;
-  private MessageListener messageListener;
+    private static volatile MosquittoJNI mInstance = null;
+    private MessageListener messageListener;
 
-  static {
-    System.loadLibrary("mosquitto");
-    System.loadLibrary("mqtt");
-  }
+    static {
+        System.loadLibrary("mosquitto");
+        System.loadLibrary("mqtt");
+    }
 
-  private MosquittoJNI() {
-  }
+    private MosquittoJNI() {
+    }
 
-  public static MosquittoJNI getInstance() {
-    if (mInstance == null) {
-      synchronized (MosquittoJNI.class) {
+    public static MosquittoJNI getInstance() {
         if (mInstance == null) {
-          mInstance = new MosquittoJNI();
+            synchronized (MosquittoJNI.class) {
+                if (mInstance == null) {
+                    mInstance = new MosquittoJNI();
+                }
+            }
         }
-      }
+        return mInstance;
     }
-    return mInstance;
-  }
 
-  public native int nativeSetupJNI();
+    public native int nativeSetupJNI();
 
-  public native int nativeRunMain(Object arguments);
+    public native int nativeRunMain(Object arguments);
 
-  public native int subscribe(String[] topics, int qos);
+    public native int subscribe(String[] topics, int qos);
 
-  public native int unsubscribe(String[] topics);
+    public native int unsubscribe(String[] topics);
 
-  public native int publish(Object arguments);
+    public native int publish(String topic, String message, int qos);
 
-  public native void nativeQuit();
+    public native void nativeQuit();
 
-  private void onMessage(String topic, byte[] message) {
-    if (messageListener != null) {
-      messageListener.onMessage(topic, message);
+    private void onMessage(String topic, byte[] message) {
+        if (messageListener != null) {
+            messageListener.onMessage(topic, message);
+        }
     }
-  }
 
-  private void onConnect() {
-    if (messageListener != null) {
-      messageListener.onConnect();
+    private void onConnect() {
+        if (messageListener != null) {
+            messageListener.onConnect();
+        }
     }
-  }
 
-  private void onDebugLog(String log) {
-    if (messageListener != null) {
-      messageListener.onDebugLog(log);
+    private void onDebugLog(String log) {
+        if (messageListener != null) {
+            messageListener.onDebugLog(log);
+        }
     }
-  }
 
-  private void onPublishEnd(String topic) {
-    if(messageListener != null) {
-      messageListener.onPublishEnd(topic);
+    public void setMessageListener(MessageListener messageListener) {
+        this.messageListener = messageListener;
     }
-  }
-
-  public void setMessageListener(MessageListener messageListener) {
-    this.messageListener = messageListener;
-  }
 }

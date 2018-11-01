@@ -60,7 +60,7 @@ public class MqttService extends Service {
                 case MSG_MESSAGE:
                     Bundle bundle = msg.getData();
                     bundle.setClassLoader(getClass().getClassLoader());
-                    MqttMessage message = bundle.getParcelable(BUNDLE_MESSAGE);
+                    final MqttMessage message = bundle.getParcelable(BUNDLE_MESSAGE);
                     switch (message.getMsgType()) {
                         case MqttMessage.SUBSCRIBE:
                             mMosquitto.subscribe(new String[]{message.getTopic()}, message.getQos());
@@ -69,27 +69,7 @@ public class MqttService extends Service {
                             mMosquitto.unsubscribe(new String[]{message.getTopic()});
                             break;
                         case MqttMessage.PUBLISH:
-                            final StringBuffer stringBuffer = new StringBuffer("mosquitto_pub ");
-                            stringBuffer.append("-h ");
-                            stringBuffer.append(mCfg.getHost() + " ");
-                            stringBuffer.append("-p ");
-                            stringBuffer.append(mCfg.getPort() + " ");
-                            stringBuffer.append("-i ");
-                            stringBuffer.append(mCfg.getId() + "-pub ");
-                            stringBuffer.append("-t ");
-                            stringBuffer.append(message.getTopic() + " ");
-                            stringBuffer.append("-m ");
-                            stringBuffer.append(message.payloadToString() + " ");
-                            stringBuffer.append("-q ");
-                            stringBuffer.append(1 + " ");
-                            stringBuffer.append("-d");
-                            mFixedThreadPool.submit(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Log.e(TAG, stringBuffer.toString());
-                                    mMosquitto.publish(stringBuffer.toString().split(" "));
-                                }
-                            });
+                            mMosquitto.publish(message.getTopic(), message.payloadToString(), message.getQos());
                             break;
                     }
                     break;
@@ -142,12 +122,7 @@ public class MqttService extends Service {
 
             @Override
             public void onDebugLog(String log) {
-                Log.e(TAG, log);
-            }
-
-            @Override
-            public void onPublishEnd(String topic) {
-                Log.e(TAG, "onPublishEnd:" + topic);
+                
             }
         });
     }

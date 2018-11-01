@@ -156,9 +156,7 @@ public class Mqtt {
         message.setTopic(topic);
         message.setPayload(payload);
         message.setQos(qos);
-        if (connected) {
-            sendMessage(message);
-        }
+        sendMessage(message);
     }
 
     private void sendMessage(MqttMessage mqttMessage) {

@@ -6,6 +6,4 @@ public interface MessageListener {
     void onConnect();
 
     void onDebugLog(String log);
-
-    void onPublishEnd(String topic);
 }

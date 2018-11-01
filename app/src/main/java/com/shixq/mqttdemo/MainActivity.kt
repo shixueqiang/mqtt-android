@@ -3,6 +3,7 @@ package com.shixq.mqttdemo
 import android.os.Bundle
 import android.provider.Settings
 import android.support.v7.app.AppCompatActivity
+import android.text.TextUtils
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -52,17 +53,19 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         when (v?.id) {
             R.id.btn_send -> {
                 var message = etMessage.text.toString()
-                val lastChar = message.last()
-                if (lastChar == ' ') {
-                    message = message.substring(0, message.lastIndex - 1)
+                if (!TextUtils.isEmpty(message)) {
+                    val lastChar = message.last()
+                    if (lastChar == ' ') {
+                        message = message.substring(0, message.lastIndex - 1)
+                    }
+                    mqtt.publish("test/topic", message.toByteArray(), 1)
+                    val stringBuffer = StringBuffer()
+                    stringBuffer.append(tvMessage.text)
+                    stringBuffer.append("\n")
+                    stringBuffer.append(message)
+                    tvMessage.text = stringBuffer.toString()
+                    etMessage.setText("")
                 }
-                mqtt.publish("test/topic", message.toByteArray(), 1)
-                val stringBuffer = StringBuffer()
-                stringBuffer.append(tvMessage.text)
-                stringBuffer.append("\n")
-                stringBuffer.append(message)
-                tvMessage.text = stringBuffer.toString()
-                etMessage.setText("")
             }
         }
     }
