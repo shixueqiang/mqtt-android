@@ -16,9 +16,6 @@ import com.shixq.mqtt.model.Config;
 import com.shixq.mqtt.model.MqttMessage;
 import com.shixq.mqtt.service.MqttService;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Created with shixq.
  * Description:
@@ -28,35 +25,29 @@ import java.util.List;
 public class Mqtt {
     private String TAG = "Mqtt";
     private static volatile Mqtt mInstance;
-    private Messenger mRemoteMessenger;
+    private Messenger mService;
     private Context mContext;
     private Config mCfg;
-    private boolean connected;
-    private List<MqttMessage> needSubscribe = new ArrayList<>();
-    private List<MqttMessage> needUnsubscribe = new ArrayList<>();
+    private boolean mIsBound;
     private MessageCallback mMessageCallback;
 
     public interface MessageCallback {
+        void onConnect();
+
         void onMessage(MqttMessage message);
     }
 
-    private class MessengerHandler extends Handler {
+    private class IncomingHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             switch (msg.what) {
                 case MqttService.MSG_CONNECT:
-                    connected = true;
-                    if (mRemoteMessenger != null) {
-                        for (MqttMessage mqttMessage : needSubscribe) {
-                            Mqtt.this.sendMessage(mqttMessage);
-                        }
-                        for (MqttMessage mqttMessage : needUnsubscribe) {
-                            Mqtt.this.sendMessage(mqttMessage);
-                        }
+                    if (mMessageCallback != null) {
+                        mMessageCallback.onConnect();
                     }
                     break;
-                case MqttService.MSG_MESSAGE_CALLBACK:
+                case MqttService.MSG_DISPATCH_MESSAGE:
                     if (mMessageCallback != null) {
                         Bundle bundle = msg.getData();
                         bundle.setClassLoader(getClass().getClassLoader());
@@ -69,26 +60,27 @@ public class Mqtt {
         }
     }
 
-    private final Messenger mMessenger = new Messenger(new MessengerHandler());
+    private final Messenger mMessenger = new Messenger(new IncomingHandler());
 
     private final ServiceConnection mConn = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
             Log.e(TAG, "onServiceConnected");
-            mRemoteMessenger = new Messenger(iBinder);
-            Message message = Message.obtain(null, MqttService.MSG_CLIENT_MESSENGER);
+            mService = new Messenger(iBinder);
+            Message message = Message.obtain(null, MqttService.MSG_REGISTER_CLIENT);
             message.replyTo = mMessenger;
             try {
-                mRemoteMessenger.send(message);
+                mService.send(message);
             } catch (RemoteException e) {
-                Log.e(TAG, "RemoteException", e);
                 e.printStackTrace();
             }
+            doStartService();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
             Log.e(TAG, "onServiceDisconnected");
+            mService = null;
         }
     };
 
@@ -116,15 +108,7 @@ public class Mqtt {
         if (mCfg == null) {
             throw new NullPointerException("must call config before start");
         }
-        Log.e(TAG, "start");
-        Intent service = new Intent(mContext, MqttService.class);
-        Bundle bundle = new Bundle();
-        bundle.putParcelable(MqttService.MQTT_CONFIG, mCfg);
-        service.putExtra(MqttService.BUNDLE_CONFIG, bundle);
-        mContext.startService(service);
-        if (mRemoteMessenger == null) {
-            mContext.bindService(service, mConn, Context.BIND_AUTO_CREATE);
-        }
+        doBindService();
     }
 
     public void subscribe(String topic, int qos) {
@@ -132,22 +116,14 @@ public class Mqtt {
         message.setMsgType(MqttMessage.SUBSCRIBE);
         message.setTopic(topic);
         message.setQos(qos);
-        if (connected) {
-            sendMessage(message);
-        } else {
-            needSubscribe.add(message);
-        }
+        sendMessage(message);
     }
 
     public void unsubscribe(String topic) {
         MqttMessage message = new MqttMessage();
         message.setMsgType(MqttMessage.UNSUBSCRIBE);
         message.setTopic(topic);
-        if (connected) {
-            sendMessage(message);
-        } else {
-            needUnsubscribe.add(message);
-        }
+        sendMessage(message);
     }
 
     public void publish(String topic, byte[] payload, int qos) {
@@ -161,24 +137,64 @@ public class Mqtt {
 
     private void sendMessage(MqttMessage mqttMessage) {
         Message message = Message.obtain();
-        message.what = MqttService.MSG_MESSAGE;
+        message.what = MqttService.MSG_RECEIVE_MESSAGE;
         Bundle bundle = new Bundle();
         bundle.putParcelable(MqttService.BUNDLE_MESSAGE, mqttMessage);
         message.setData(bundle);
-        if (mRemoteMessenger != null) {
-            try {
-                mRemoteMessenger.send(message);
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
+        try {
+            mService.send(message);
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+        } catch (RemoteException e) {
+            e.printStackTrace();
         }
     }
 
-    public void setmMessageCallback(MessageCallback mMessageCallback) {
-        this.mMessageCallback = mMessageCallback;
+    void doStartService() {
+        Intent service = new Intent(mContext, MqttService.class);
+        Bundle bundle = new Bundle();
+        bundle.putParcelable(MqttService.MQTT_CONFIG, mCfg);
+        service.putExtra(MqttService.BUNDLE_CONFIG, bundle);
+        mContext.startService(service);
+    }
+
+    void doBindService() {
+        Intent service = new Intent(mContext, MqttService.class);
+        Bundle bundle = new Bundle();
+        bundle.putParcelable(MqttService.MQTT_CONFIG, mCfg);
+        service.putExtra(MqttService.BUNDLE_CONFIG, bundle);
+        mContext.bindService(service, mConn, Context.BIND_AUTO_CREATE);
+        mIsBound = true;
+    }
+
+    void doUnbindService() {
+        if (mIsBound) {
+            // If we have received the service, and hence registered with
+            // it, then now is the time to unregister.
+            if (mService != null) {
+                try {
+                    Message msg = Message.obtain(null,
+                            MqttService.MSG_UNREGISTER_CLIENT);
+                    msg.replyTo = mMessenger;
+                    mService.send(msg);
+                } catch (RemoteException e) {
+                    // There is nothing special we need to do if the service
+                    // has crashed.
+                }
+            }
+
+            // Detach our existing connection.
+            mContext.unbindService(mConn);
+            mIsBound = false;
+        }
+    }
+
+
+    public void setMessageCallback(MessageCallback messageCallback) {
+        this.mMessageCallback = messageCallback;
     }
 
     public void onDestroy() {
-        mContext.unbindService(mConn);
+        doUnbindService();
     }
 }

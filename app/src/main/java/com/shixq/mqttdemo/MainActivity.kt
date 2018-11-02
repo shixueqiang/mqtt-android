@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.TextView
 import com.shixq.mqtt.Mqtt
 import com.shixq.mqtt.model.Config
+import com.shixq.mqtt.model.MqttMessage
 import java.nio.charset.Charset
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
@@ -36,17 +37,23 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 .debug(true)
                 .build()
         mqtt.config(config)
-        mqtt.setmMessageCallback { msg ->
-            runOnUiThread {
-                val stringBuffer = StringBuffer()
-                stringBuffer.append(tvMessage.text)
-                stringBuffer.append("\n")
-                stringBuffer.append(String(msg.payload, Charset.forName("utf-8")))
-                tvMessage.text = stringBuffer.toString()
+        mqtt.setMessageCallback(object : Mqtt.MessageCallback {
+            override fun onConnect() {
+                mqtt.subscribe("test/shixq", 1)
             }
-        }
+
+            override fun onMessage(message: MqttMessage) {
+                runOnUiThread {
+                    val stringBuffer = StringBuffer()
+                    stringBuffer.append(tvMessage.text)
+                    stringBuffer.append("\n")
+                    stringBuffer.append(String(message.payload, Charset.forName("utf-8")))
+                    tvMessage.text = stringBuffer.toString()
+                }
+            }
+
+        })
         mqtt.start()
-        mqtt.subscribe("test/shixq", 1)
     }
 
     override fun onClick(v: View?) {
@@ -54,10 +61,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             R.id.btn_send -> {
                 var message = etMessage.text.toString()
                 if (!TextUtils.isEmpty(message)) {
-                    val lastChar = message.last()
-                    if (lastChar == ' ') {
-                        message = message.substring(0, message.lastIndex - 1)
-                    }
                     mqtt.publish("test/topic", message.toByteArray(), 1)
                     val stringBuffer = StringBuffer()
                     stringBuffer.append(tvMessage.text)

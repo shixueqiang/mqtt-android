@@ -17,6 +17,7 @@ import com.mqtt.jni.MosquittoJNI;
 import com.shixq.mqtt.model.Config;
 import com.shixq.mqtt.model.MqttMessage;
 
+import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,35 +30,30 @@ import java.util.concurrent.Executors;
 public class MqttService extends Service {
     private final String TAG = "MqttService";
     private MosquittoJNI mMosquitto;
-    private Messenger mClientMessenger;
+    private ArrayList<Messenger> mClients = new ArrayList<>();
     private Config mCfg;
-    private boolean isConnected;
     private boolean isStarted;
     private ExecutorService mFixedThreadPool = Executors.newFixedThreadPool(5);
-    public static final int MSG_CLIENT_MESSENGER = 0x1;
-    public static final int MSG_MESSAGE = 0x2;
-    public static final int MSG_MESSAGE_CALLBACK = 0x3;
-    public static final int MSG_CONNECT = 0x4;
+    public static final int MSG_REGISTER_CLIENT = 0x1;
+    public static final int MSG_UNREGISTER_CLIENT = 0x2;
+    public static final int MSG_RECEIVE_MESSAGE = 0x3;
+    public static final int MSG_DISPATCH_MESSAGE = 0x4;
+    public static final int MSG_CONNECT = 0x5;
     public static final String MQTT_CONFIG = "MQTT_CONFIG";
     public static final String BUNDLE_CONFIG = "BUNDLE_CONFIG";
     public static final String BUNDLE_MESSAGE = "BUNDLE_MESSAGE";
 
-    private class MessengerHandler extends Handler {
+    private class IncomingHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
-            super.handleMessage(msg);
             switch (msg.what) {
-                case MSG_CLIENT_MESSENGER:
-                    mClientMessenger = msg.replyTo;
-                    if (isConnected) {
-                        try {
-                            mClientMessenger.send(Message.obtain(null, MSG_CONNECT));
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    }
+                case MSG_REGISTER_CLIENT:
+                    mClients.add(msg.replyTo);
                     break;
-                case MSG_MESSAGE:
+                case MSG_UNREGISTER_CLIENT:
+                    mClients.remove(msg.replyTo);
+                    break;
+                case MSG_RECEIVE_MESSAGE:
                     Bundle bundle = msg.getData();
                     bundle.setClassLoader(getClass().getClassLoader());
                     final MqttMessage message = bundle.getParcelable(BUNDLE_MESSAGE);
@@ -69,60 +65,45 @@ public class MqttService extends Service {
                             mMosquitto.unsubscribe(new String[]{message.getTopic()});
                             break;
                         case MqttMessage.PUBLISH:
-                            mMosquitto.publish(message.getTopic(), message.payloadToString(), message.getQos());
+                            mMosquitto.publish(message.getTopic(), message.getPayload(), message.getQos());
                             break;
                     }
                     break;
                 default:
+                    super.handleMessage(msg);
             }
         }
     }
 
-    private final Messenger mMessenger = new Messenger(new MessengerHandler());
+    private final Messenger mMessenger = new Messenger(new IncomingHandler());
 
     @Override
     public void onCreate() {
-        Log.e(TAG, "onCreate");
         super.onCreate();
+        Log.e(TAG, "onCreate");
         mMosquitto = MosquittoJNI.getInstance();
         mMosquitto.setMessageListener(new MessageListener() {
             @Override
             public void onMessage(String topic, byte[] message) {
                 Message msg = Message.obtain();
-                msg.what = MSG_MESSAGE_CALLBACK;
+                msg.what = MSG_DISPATCH_MESSAGE;
                 MqttMessage m = new MqttMessage();
                 m.setTopic(topic);
                 m.setPayload(message);
                 Bundle bundle = new Bundle();
                 bundle.putParcelable(BUNDLE_MESSAGE, m);
                 msg.setData(bundle);
-                try {
-                    mClientMessenger.send(msg);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "RemoteException", e);
-                    e.printStackTrace();
-                }
+                dispatchMessage(msg);
             }
 
             @Override
             public void onConnect() {
-                try {
-                    Log.e(TAG, "onConnect");
-                    isConnected = true;
-                    if (mClientMessenger != null) {
-                        mClientMessenger.send(Message.obtain(null, MSG_CONNECT));
-                    } else {
-                        Log.e(TAG, "onConnect mClientMessenger is null");
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "RemoteException", e);
-                    e.printStackTrace();
-                }
+                dispatchMessage(Message.obtain(null, MSG_CONNECT));
             }
 
             @Override
             public void onDebugLog(String log) {
-                
+
             }
         });
     }
@@ -138,6 +119,19 @@ public class MqttService extends Service {
             isStarted = true;
         }
         return super.onStartCommand(intent, flags, startId);
+    }
+
+    private void dispatchMessage(Message msg) {
+        for (int i = mClients.size() - 1; i >= 0; i--) {
+            try {
+                mClients.get(i).send(msg);
+            } catch (RemoteException e) {
+                // The client is dead.  Remove it from the list;
+                // we are going through the list from back to front
+                // so this is safe to do inside the loop.
+                mClients.remove(i);
+            }
+        }
     }
 
     private void nativeRun(Config cfg) {
@@ -169,7 +163,10 @@ public class MqttService extends Service {
         mFixedThreadPool.submit(new Runnable() {
             @Override
             public void run() {
-                mMosquitto.nativeRunMain(argv);
+                if (mMosquitto.nativeRunMain(argv) != 0) {
+                    //启动失败
+                    stopSelf();
+                }
             }
         });
     }
