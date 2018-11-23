@@ -6,6 +6,7 @@ public class MosquittoJNI {
 
     static {
         System.loadLibrary("mosquitto");
+        System.loadLibrary("msgpackc");
         System.loadLibrary("mqtt");
     }
 
