@@ -1,5 +1,6 @@
 package com.shixq.mqttdemo
 
+import android.Manifest
 import android.os.Bundle
 import android.provider.Settings
 import android.support.v7.app.AppCompatActivity
@@ -12,7 +13,9 @@ import android.widget.TextView
 import com.shixq.mqtt.Mqtt
 import com.shixq.mqtt.model.Config
 import com.shixq.mqtt.model.MqttMessage
+import com.tbruyelle.rxpermissions2.RxPermissions
 import java.nio.charset.Charset
+
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
     private val TAG = "MainActivity"
@@ -39,7 +42,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         mqtt.config(config)
         mqtt.setMessageCallback(object : Mqtt.MessageCallback {
             override fun onConnect() {
-                mqtt.subscribe("test/shixq", 1)
+                mqtt.subscribe("test/topic", 1)
             }
 
             override fun onMessage(message: MqttMessage) {
@@ -61,7 +64,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             R.id.btn_send -> {
                 var message = etMessage.text.toString()
                 if (!TextUtils.isEmpty(message)) {
-                    mqtt.publish("test/topic", message.toByteArray(), 1)
+                    mqtt.publish("test/shixq", message.toByteArray(), 1)
                     val stringBuffer = StringBuffer()
                     stringBuffer.append(tvMessage.text)
                     stringBuffer.append("\n")
