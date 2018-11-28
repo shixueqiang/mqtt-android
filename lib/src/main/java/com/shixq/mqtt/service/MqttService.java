@@ -14,8 +14,9 @@ import android.util.Log;
 
 import com.mqtt.jni.MessageListener;
 import com.mqtt.jni.MosquittoJNI;
+import com.mqtt.jni.ReceiveMessage;
 import com.shixq.mqtt.model.Config;
-import com.shixq.mqtt.model.MqttMessage;
+import com.shixq.mqtt.model.SendMessage;
 
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
@@ -56,16 +57,16 @@ public class MqttService extends Service {
                 case MSG_RECEIVE_MESSAGE:
                     Bundle bundle = msg.getData();
                     bundle.setClassLoader(getClass().getClassLoader());
-                    final MqttMessage message = bundle.getParcelable(BUNDLE_MESSAGE);
+                    final SendMessage message = bundle.getParcelable(BUNDLE_MESSAGE);
                     switch (message.getMsgType()) {
-                        case MqttMessage.SUBSCRIBE:
+                        case SendMessage.SUBSCRIBE:
                             mMosquitto.subscribe(new String[]{message.getTopic()}, message.getQos());
                             break;
-                        case MqttMessage.UNSUBSCRIBE:
+                        case SendMessage.UNSUBSCRIBE:
                             mMosquitto.unsubscribe(new String[]{message.getTopic()});
                             break;
-                        case MqttMessage.PUBLISH:
-                            mMosquitto.publish(message.getTopic(), message.getPayload(), message.getQos());
+                        case SendMessage.PUBLISH:
+                            mMosquitto.publish(message.getTopic(), message.getMsgPayload(), message.getQos());
                             break;
                     }
                     break;
@@ -84,14 +85,11 @@ public class MqttService extends Service {
         mMosquitto = MosquittoJNI.getInstance();
         mMosquitto.setMessageListener(new MessageListener() {
             @Override
-            public void onMessage(String topic, byte[] message) {
+            public void onMessage(ReceiveMessage message) {
                 Message msg = Message.obtain();
                 msg.what = MSG_DISPATCH_MESSAGE;
-                MqttMessage m = new MqttMessage();
-                m.setTopic(topic);
-                m.setPayload(message);
                 Bundle bundle = new Bundle();
-                bundle.putParcelable(BUNDLE_MESSAGE, m);
+                bundle.putParcelable(BUNDLE_MESSAGE, message);
                 msg.setData(bundle);
                 dispatchMessage(msg);
             }
@@ -151,6 +149,18 @@ public class MqttService extends Service {
         if (!TextUtils.isEmpty(cfg.getPassword())) {
             mBuffer.append("-P ");
             mBuffer.append(cfg.getPassword() + " ");
+        }
+        if (!TextUtils.isEmpty(cfg.getCafile())) {
+            mBuffer.append("--cafile ");
+            mBuffer.append(cfg.getCafile() + " ");
+        }
+        if (!TextUtils.isEmpty(cfg.getCertfile())) {
+            mBuffer.append("--cert ");
+            mBuffer.append(cfg.getCertfile() + " ");
+        }
+        if (!TextUtils.isEmpty(cfg.getKeyfile())) {
+            mBuffer.append("--key ");
+            mBuffer.append(cfg.getKeyfile() + " ");
         }
         if (cfg.getKeepalive() > 0) {
             mBuffer.append("-k ");

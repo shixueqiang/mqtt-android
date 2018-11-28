@@ -3,44 +3,42 @@ package com.shixq.mqtt.model;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import java.io.UnsupportedEncodingException;
-
 /**
  * Created with author.
  * Description:
  * Date: 2018-10-26
  * Time: 下午4:58
  */
-public class MqttMessage implements Parcelable {
+public class SendMessage implements Parcelable {
     private int msgType;
     private String topic;
-    private byte[] payload;
+    private String msgPayload;
     private int qos;
     public static final int CONNACK = 0x20;
     public static final int PUBLISH = 0x30;
     public static final int SUBSCRIBE = 0x80;
     public static final int UNSUBSCRIBE = 0xA0;
 
-    public MqttMessage() {
+    public SendMessage() {
 
     }
 
-    protected MqttMessage(Parcel in) {
+    protected SendMessage(Parcel in) {
         msgType = in.readInt();
         topic = in.readString();
-        payload = in.createByteArray();
+        msgPayload = in.readString();
         qos = in.readInt();
     }
 
-    public static final Creator<MqttMessage> CREATOR = new Creator<MqttMessage>() {
+    public static final Creator<SendMessage> CREATOR = new Creator<SendMessage>() {
         @Override
-        public MqttMessage createFromParcel(Parcel in) {
-            return new MqttMessage(in);
+        public SendMessage createFromParcel(Parcel in) {
+            return new SendMessage(in);
         }
 
         @Override
-        public MqttMessage[] newArray(int size) {
-            return new MqttMessage[size];
+        public SendMessage[] newArray(int size) {
+            return new SendMessage[size];
         }
     };
 
@@ -60,21 +58,12 @@ public class MqttMessage implements Parcelable {
         this.topic = topic;
     }
 
-    public byte[] getPayload() {
-        return payload;
+    public String getMsgPayload() {
+        return msgPayload;
     }
 
-    public String payloadToString() {
-        try {
-            return new String(payload, "utf-8");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return payload.toString();
-    }
-
-    public void setPayload(byte[] payload) {
-        this.payload = payload;
+    public void setMsgPayload(String msgPayload) {
+        this.msgPayload = msgPayload;
     }
 
     public int getQos() {
@@ -94,7 +83,7 @@ public class MqttMessage implements Parcelable {
     public void writeToParcel(Parcel parcel, int i) {
         parcel.writeInt(msgType);
         parcel.writeString(topic);
-        parcel.writeByteArray(payload);
+        parcel.writeString(msgPayload);
         parcel.writeInt(qos);
     }
 }

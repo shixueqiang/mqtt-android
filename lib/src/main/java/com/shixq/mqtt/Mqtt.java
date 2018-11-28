@@ -12,8 +12,9 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
 
+import com.mqtt.jni.ReceiveMessage;
 import com.shixq.mqtt.model.Config;
-import com.shixq.mqtt.model.MqttMessage;
+import com.shixq.mqtt.model.SendMessage;
 import com.shixq.mqtt.service.MqttService;
 
 /**
@@ -34,7 +35,7 @@ public class Mqtt {
     public interface MessageCallback {
         void onConnect();
 
-        void onMessage(MqttMessage message);
+        void onMessage(ReceiveMessage message);
     }
 
     private class IncomingHandler extends Handler {
@@ -51,7 +52,7 @@ public class Mqtt {
                     if (mMessageCallback != null) {
                         Bundle bundle = msg.getData();
                         bundle.setClassLoader(getClass().getClassLoader());
-                        MqttMessage message = bundle.getParcelable(MqttService.BUNDLE_MESSAGE);
+                        ReceiveMessage message = bundle.getParcelable(MqttService.BUNDLE_MESSAGE);
                         mMessageCallback.onMessage(message);
                     }
                     break;
@@ -112,30 +113,30 @@ public class Mqtt {
     }
 
     public void subscribe(String topic, int qos) {
-        MqttMessage message = new MqttMessage();
-        message.setMsgType(MqttMessage.SUBSCRIBE);
+        SendMessage message = new SendMessage();
+        message.setMsgType(SendMessage.SUBSCRIBE);
         message.setTopic(topic);
         message.setQos(qos);
         sendMessage(message);
     }
 
     public void unsubscribe(String topic) {
-        MqttMessage message = new MqttMessage();
-        message.setMsgType(MqttMessage.UNSUBSCRIBE);
+        SendMessage message = new SendMessage();
+        message.setMsgType(SendMessage.UNSUBSCRIBE);
         message.setTopic(topic);
         sendMessage(message);
     }
 
-    public void publish(String topic, byte[] payload, int qos) {
-        MqttMessage message = new MqttMessage();
-        message.setMsgType(MqttMessage.PUBLISH);
+    public void publish(String topic, String payload, int qos) {
+        SendMessage message = new SendMessage();
+        message.setMsgType(SendMessage.PUBLISH);
         message.setTopic(topic);
-        message.setPayload(payload);
+        message.setMsgPayload(payload);
         message.setQos(qos);
         sendMessage(message);
     }
 
-    private void sendMessage(MqttMessage mqttMessage) {
+    private void sendMessage(SendMessage mqttMessage) {
         Message message = Message.obtain();
         message.what = MqttService.MSG_RECEIVE_MESSAGE;
         Bundle bundle = new Bundle();

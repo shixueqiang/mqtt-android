@@ -15,6 +15,9 @@ public class Config implements Parcelable {
     private int port = 1883;
     private String username;
     private String password;
+    private String cafile;
+    private String certfile;
+    private String keyfile;
     private int keepalive = 60;
     private int protocolVersion = MQTT_PROTOCOL_V311;
     private boolean debug;
@@ -27,6 +30,9 @@ public class Config implements Parcelable {
         port = in.readInt();
         username = in.readString();
         password = in.readString();
+        cafile = in.readString();
+        certfile = in.readString();
+        keyfile = in.readString();
         keepalive = in.readInt();
         protocolVersion = in.readInt();
         debug = in.readByte() != 0;
@@ -38,6 +44,9 @@ public class Config implements Parcelable {
         port = builder.port;
         username = builder.username;
         password = builder.password;
+        cafile = builder.cafile;
+        certfile = builder.certfile;
+        keyfile = builder.keyfile;
         keepalive = builder.keepalive;
         protocolVersion = builder.protocolVersion;
         debug = builder.debug;
@@ -49,6 +58,9 @@ public class Config implements Parcelable {
         private int port;
         private String username;
         private String password;
+        private String cafile;
+        private String certfile;
+        private String keyfile;
         private int keepalive;
         private int protocolVersion;
         private boolean debug;
@@ -74,6 +86,21 @@ public class Config implements Parcelable {
 
         public Builder password(String val) {
             password = val;
+            return this;
+        }
+
+        public Builder cafile(String val) {
+            cafile = val;
+            return this;
+        }
+
+        public Builder certfile(String val) {
+            certfile = val;
+            return this;
+        }
+
+        public Builder keyfile(String val) {
+            keyfile = val;
             return this;
         }
 
@@ -149,6 +176,30 @@ public class Config implements Parcelable {
         this.password = password;
     }
 
+    public String getCafile() {
+        return cafile;
+    }
+
+    public void setCafile(String cafile) {
+        this.cafile = cafile;
+    }
+
+    public String getCertfile() {
+        return certfile;
+    }
+
+    public void setCertfile(String certfile) {
+        this.certfile = certfile;
+    }
+
+    public String getKeyfile() {
+        return keyfile;
+    }
+
+    public void setKeyfile(String keyfile) {
+        this.keyfile = keyfile;
+    }
+
     public int getKeepalive() {
         return keepalive;
     }
@@ -185,6 +236,9 @@ public class Config implements Parcelable {
         parcel.writeInt(port);
         parcel.writeString(username);
         parcel.writeString(password);
+        parcel.writeString(cafile);
+        parcel.writeString(certfile);
+        parcel.writeString(keyfile);
         parcel.writeInt(keepalive);
         parcel.writeInt(protocolVersion);
         parcel.writeByte((byte) (debug ? 1 : 0));
