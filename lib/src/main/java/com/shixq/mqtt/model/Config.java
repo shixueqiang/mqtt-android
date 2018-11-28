@@ -21,6 +21,8 @@ public class Config implements Parcelable {
     private int keepalive = 60;
     private int protocolVersion = MQTT_PROTOCOL_V311;
     private boolean debug;
+    //是否接收离线消息
+    private boolean disableCleanSession;
     public static final int MQTT_PROTOCOL_V31 = 3;
     public static final int MQTT_PROTOCOL_V311 = 4;
 
@@ -36,6 +38,7 @@ public class Config implements Parcelable {
         keepalive = in.readInt();
         protocolVersion = in.readInt();
         debug = in.readByte() != 0;
+        disableCleanSession = in.readByte() != 0;
     }
 
     private Config(Builder builder) {
@@ -50,6 +53,7 @@ public class Config implements Parcelable {
         keepalive = builder.keepalive;
         protocolVersion = builder.protocolVersion;
         debug = builder.debug;
+        disableCleanSession = builder.disableCleanSession;
     }
 
     public static class Builder {
@@ -64,6 +68,7 @@ public class Config implements Parcelable {
         private int keepalive;
         private int protocolVersion;
         private boolean debug;
+        private boolean disableCleanSession;
 
         public Builder(String host) {
             this.host = host;
@@ -116,6 +121,11 @@ public class Config implements Parcelable {
 
         public Builder debug(boolean val) {
             debug = val;
+            return this;
+        }
+
+        public Builder disableCleanSession(boolean val) {
+            disableCleanSession = val;
             return this;
         }
 
@@ -224,6 +234,14 @@ public class Config implements Parcelable {
         this.debug = debug;
     }
 
+    public boolean isDisableCleanSession() {
+        return disableCleanSession;
+    }
+
+    public void setDisableCleanSession(boolean disableCleanSession) {
+        this.disableCleanSession = disableCleanSession;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -242,5 +260,6 @@ public class Config implements Parcelable {
         parcel.writeInt(keepalive);
         parcel.writeInt(protocolVersion);
         parcel.writeByte((byte) (debug ? 1 : 0));
+        parcel.writeByte((byte) (disableCleanSession ? 1 : 0));
     }
 }

@@ -39,8 +39,9 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         val builder = Config.Builder("192.168.0.114")
                 .id(ANDROID_ID)
                 .port(1883)
+                .disableCleanSession(true)
                 .debug(true)
-        if (!BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG) {
             copyCerts(cafile, filesDir.absolutePath.plus(File.separator).plus(cafile))
             copyCerts(certfile, filesDir.absolutePath.plus(File.separator).plus(certfile))
             copyCerts(keyfile, filesDir.absolutePath.plus(File.separator).plus(keyfile))

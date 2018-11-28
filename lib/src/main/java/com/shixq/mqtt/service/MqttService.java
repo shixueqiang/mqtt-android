@@ -167,7 +167,11 @@ public class MqttService extends Service {
             mBuffer.append(cfg.getKeepalive() + " ");
         }
         if (cfg.isDebug()) {
-            mBuffer.append("-d");
+            mBuffer.append("-d ");
+        }
+        if(cfg.isDisableCleanSession()) {
+            //不设置此选项,客户端断开连接后，服务器会清楚此连接信息和离线消息,see mosquitto context__cleanup
+            mBuffer.append("--disable-clean-session");
         }
         final String[] argv = mBuffer.toString().split(" ");
         mFixedThreadPool.submit(new Runnable() {
