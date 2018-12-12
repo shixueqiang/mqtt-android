@@ -20,7 +20,9 @@ import com.shixq.mqtt.model.SendMessage;
 
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created with shixq.
@@ -34,7 +36,14 @@ public class MqttService extends Service {
     private ArrayList<Messenger> mClients = new ArrayList<>();
     private Config mCfg;
     private boolean isStarted;
-    private ExecutorService mFixedThreadPool = Executors.newFixedThreadPool(5);
+    private static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
+    //核心线程数量大小
+    private static final int corePoolSize = Math.max(2, Math.min(CPU_COUNT - 1, 4));
+    //线程池最大容纳线程数
+    private static final int maximumPoolSize = CPU_COUNT * 2 + 1;
+    //线程空闲后的存活时长
+    private static final int keepAliveTime = 30;
+    private ExecutorService mThreadPool = new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
     public static final int MSG_REGISTER_CLIENT = 0x1;
     public static final int MSG_UNREGISTER_CLIENT = 0x2;
     public static final int MSG_RECEIVE_MESSAGE = 0x3;
@@ -169,12 +178,12 @@ public class MqttService extends Service {
         if (cfg.isDebug()) {
             mBuffer.append("-d ");
         }
-        if(cfg.isDisableCleanSession()) {
-            //不设置此选项,客户端断开连接后，服务器会清楚此连接信息和离线消息,see mosquitto context__cleanup
+        if (cfg.isDisableCleanSession()) {
+            //不设置此选项,客户端断开连接后，服务器会清楚此连接信息和离线消息,see mosquitto loop.c , context__add_to_disused , context__free_disused
             mBuffer.append("--disable-clean-session");
         }
         final String[] argv = mBuffer.toString().split(" ");
-        mFixedThreadPool.submit(new Runnable() {
+        mThreadPool.submit(new Runnable() {
             @Override
             public void run() {
                 if (mMosquitto.nativeRunMain(argv) != 0) {
